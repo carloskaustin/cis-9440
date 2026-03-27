@@ -1,9 +1,10 @@
 version: 2
+
 sources:
   - name: raw
     description: Raw data loaded from NYC Open Data
     database: ca-cis-9440
-    schema: nyc_311_raw_data 
+    schema: nyc_311_raw_data
     tables:
       - name: source_dot_service_requests_history
         description: |
@@ -40,7 +41,7 @@ sources:
           - name: longitude
             description: Longitude coordinate
           - name: address_type
-            description: 'Type of address (e.g., ADDRESS, INTERSECTION, BLOCKFACE)'
+            description: Type of address (e.g., ADDRESS, INTERSECTION, BLOCKFACE)
           - name: bbl
             description: Borough Block and Lot number (NYC tax lot id)
           - name: borough
@@ -89,3 +90,81 @@ sources:
             description: Y coordinate in NY State Plane projection system (NAD 83)
           - name: landmark
             description: Nearby landmark or point of interest
+
+      - name: source_nyc_open_restaurant_apps
+        description: |
+          NYC restaurant applications.
+          One row per application.
+        columns:
+          - name: object_id
+            description: Unique ID for the restaurant application
+            tests:
+              - unique
+              - not_null
+          - name: sidewalk_dimensions_length
+            description: Length of sidewalk seating area
+          - name: sidewalk_dimensions_width
+            description: Width of sidewalk seating area
+          - name: sidewalk_dimensions_area
+            description: Area of sidewalk seating area
+          - name: roadway_dimensions_length
+            description: Length of roadway seating area
+          - name: roadway_dimensions_width
+            description: Width of roadway seating area
+          - name: roadway_dimensions_area
+            description: Area of roadway seating area
+          - name: time_of_submission
+            description: Date and time the application was submitted
+          - name: latitude
+            description: Latitude coordinate
+          - name: longitude
+            description: Longitude coordinate
+          - name: zip
+            description: ZIP code
+          - name: approved_for_roadway_seating
+            description: Whether the application was approved for roadway seating
+          - name: approved_for_walkway_seating
+            description: Whether the application was approved for walkway seating
+          - name: bbl
+            description: Borough Block and Lot number (NYC tax lot id)
+          - name: bin
+            description: Building Identification Number
+          - name: borough
+            description: NYC borough
+          - name: building_number
+            description: Building number of the business address
+          - name: business_address
+            description: Full business address
+          - name: census_track
+            description: Census tract
+          - name: community_board
+            description: NYC community board district
+          - name: council_district
+            description: NYC council district
+          - name: doing_business_as_dba
+            description: Doing business as name
+          - name: food_service_establishment
+            description: Type or identifier of food service establishment
+          - name: globalid
+            description: Global unique identifier for the record
+          - name: healthcomplaince_terms
+            description: Health compliance terms associated with the application
+          - name: landmark_district_or_building
+            description: Whether the business is in a landmark district or building
+          - name: landmarkdistrict_terms
+            description: Landmark district terms
+          - name: legal_business_name
+            description: Legal name of the business
+          - name: nta
+            description: Neighborhood Tabulation Area
+          - name: qualify_alcohol
+            description: Whether the establishment qualifies for alcohol service
+          - name: restaurant_name
+            description: Name of the restaurant
+          - name: seating_interest_sidewalk
+            description: Whether the applicant requested sidewalk seating
+          - name: sla_license_type
+            description: SLA license type
+          - name: street
+            description: Street name
+       
