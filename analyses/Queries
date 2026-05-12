@@ -1,5 +1,5 @@
 
-# Query 1:
+Query 1:
 This query analyzes bus performance by month and route. It shows:
 - average bus speed
 - average travel time
@@ -25,14 +25,14 @@ GROUP BY
 ORDER BY
     avg_speed ASC;
 
-# Query 2:
+Query 2:
 This query summarizes ACE violations by borough and violation type. It shows:
 
 - Where violations are most common
 - What types of violations are most common
 
 This supports our Curb Conflict Density KPI by identifying areas with high concentrations of curb-related violations.
-*/
+
 SELECT
     l.borough,
     vt.violation_category,
@@ -48,7 +48,7 @@ GROUP BY
 ORDER BY
     total_violations DESC;
 
-# Query 3:
+Query 3:
 This query creates your final Top 25 Pilot Candidate Ranking.
 
 It combines:
@@ -63,7 +63,7 @@ This directly supports our original project goal which was to identify the stron
 
 The score ranges from 0 to 100, where higher scores indicate stronger evidence of curb pressure.
 
-*/
+
 WITH speed_metrics AS (
     SELECT
         f.route_key,
