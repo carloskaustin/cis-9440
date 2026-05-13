@@ -1,37 +1,27 @@
-
 Query 1:
-This query analyzes bus performance by month and route. It shows:
-- average bus speed
-- average travel time
-- total bus trips
-This supports our Bus Speed Impact KPI by identifying routes with slower speeds or worsening performance over time.
-
+- ACE violations over time by borough
 SELECT
     d.year,
     d.month,
-    r.route_id,
-    AVG(f.average_road_speed_mph) AS avg_speed,
-    AVG(f.average_travel_time_min) AS avg_travel_time,
-    SUM(f.bus_trip_count) AS total_bus_trips
-FROM Fact_Bus_Segment_Performance f
+    l.borough,
+    COUNT(*) AS total_ace_violations
+FROM Fact_ACE_Violations f
 JOIN Dim_Date d
     ON f.date_key = d.date_key
-JOIN Dim_Bus_Route r
-    ON f.route_key = r.route_key
+JOIN Dim_Location l
+    ON f.location_key = l.location_key
 GROUP BY
     d.year,
     d.month,
-    r.route_id
+    l.borough
 ORDER BY
-    avg_speed ASC;
+    d.year,
+    d.month,
+    total_ace_violations DESC;
 
 Query 2:
-This query summarizes ACE violations by borough and violation type. It shows:
 
-- Where violations are most common
-- What types of violations are most common
-
-This supports our Curb Conflict Density KPI by identifying areas with high concentrations of curb-related violations.
+- Identifies most common violations types in each borough.
 
 SELECT
     l.borough,
@@ -49,100 +39,127 @@ ORDER BY
     total_violations DESC;
 
 Query 3:
-This query creates your final Top 25 Pilot Candidate Ranking.
 
-It combines:
+- Shows where public complaints are concentrated and what types of curb-related issues are being reported.
 
-- bus speed loss
-- ACE violation volume
-- 311 complaint volume
+SELECT
+    l.borough,
+    ct.complaint_type,
+    COUNT(*) AS total_complaints
+FROM Fact_311_Complaints f
+JOIN Dim_Location l
+    ON f.location_key = l.location_key
+JOIN Dim_311_Complaint_Type ct
+    ON f.complaint_type_key = ct.complaint_type_key
+GROUP BY
+    l.borough,
+    ct.complaint_type
+ORDER BY
+    total_complaints DESC;
 
-into one score called the Squeeze Index.
+Query 4:
 
-This directly supports our original project goal which was to identify the strongest evidence-based candidates for a Dynamic Curb Management pilot.
+- Compares ACE enforcement activity and 311 complaint activity at the same locations.
 
-The score ranges from 0 to 100, where higher scores indicate stronger evidence of curb pressure.
-
-
-WITH speed_metrics AS (
-    SELECT
-        f.route_key,
-        f.location_key,
-        AVG(f.average_road_speed_mph) AS avg_speed,
-        AVG(f.average_travel_time_min) AS avg_travel_time,
-        SUM(f.bus_trip_count) AS total_bus_trips
-    FROM Fact_Bus_Segment_Performance f
-    GROUP BY
-        f.route_key,
-        f.location_key
-),
-
-violation_metrics AS (
+WITH ace_by_location AS (
     SELECT
         location_key,
-        COUNT(*) AS total_violations
+        COUNT(*) AS total_ace_violations
     FROM Fact_ACE_Violations
-    GROUP BY
-        location_key
+    GROUP BY location_key
+),
+
+complaints_by_location AS (
+    SELECT
+        location_key,
+        COUNT(*) AS total_311_complaints
+    FROM Fact_311_Complaints
+    GROUP BY location_key
+)
+
+SELECT
+    l.borough,
+    l.zip_code,
+    COALESCE(a.total_ace_violations, 0) AS total_ace_violations,
+    COALESCE(c.total_311_complaints, 0) AS total_311_complaints
+FROM Dim_Location l
+LEFT JOIN ace_by_location a
+    ON l.location_key = a.location_key
+LEFT JOIN complaints_by_location c
+    ON l.location_key = c.location_key
+WHERE
+    COALESCE(a.total_ace_violations, 0) > 0
+    OR COALESCE(c.total_311_complaints, 0) > 0
+ORDER BY
+    total_ace_violations DESC,
+    total_311_complaints DESC;
+
+Query 5:
+
+Creates a  Squeeze Index using:
+
+ACE violations
+311 complaints
+
+The final score ranges from 0 to 100.
+
+WITH ace_metrics AS (
+    SELECT
+        location_key,
+        COUNT(*) AS total_ace_violations
+    FROM Fact_ACE_Violations
+    GROUP BY location_key
 ),
 
 complaint_metrics AS (
     SELECT
         location_key,
-        COUNT(*) AS total_complaints
+        COUNT(*) AS total_311_complaints
     FROM Fact_311_Complaints
-    GROUP BY
-        location_key
+    GROUP BY location_key
 ),
 
 combined_metrics AS (
     SELECT
-        r.route_id,
+        l.location_key,
         l.borough,
-        s.avg_speed,
-        s.avg_travel_time,
-        s.total_bus_trips,
-        COALESCE(v.total_violations, 0) AS total_violations,
-        COALESCE(c.total_complaints, 0) AS total_complaints
-    FROM speed_metrics s
-    JOIN Dim_Bus_Route r
-        ON s.route_key = r.route_key
-    JOIN Dim_Location l
-        ON s.location_key = l.location_key
-    LEFT JOIN violation_metrics v
-        ON s.location_key = v.location_key
+        l.zip_code,
+        COALESCE(a.total_ace_violations, 0) AS total_ace_violations,
+        COALESCE(c.total_311_complaints, 0) AS total_311_complaints
+    FROM Dim_Location l
+    LEFT JOIN ace_metrics a
+        ON l.location_key = a.location_key
     LEFT JOIN complaint_metrics c
-        ON s.location_key = c.location_key
+        ON l.location_key = c.location_key
+    WHERE
+        COALESCE(a.total_ace_violations, 0) > 0
+        OR COALESCE(c.total_311_complaints, 0) > 0
 ),
 
 normalized_metrics AS (
     SELECT
         *,
-        (total_violations - MIN(total_violations) OVER()) /
-            NULLIF(MAX(total_violations) OVER() - MIN(total_violations) OVER(), 0) AS normalized_violations,
+        (total_ace_violations - MIN(total_ace_violations) OVER()) /
+            NULLIF(MAX(total_ace_violations) OVER() - MIN(total_ace_violations) OVER(), 0)
+            AS normalized_ace_violations,
 
-        (total_complaints - MIN(total_complaints) OVER()) /
-            NULLIF(MAX(total_complaints) OVER() - MIN(total_complaints) OVER(), 0) AS normalized_complaints,
-
-        ((20 - avg_speed) - MIN(20 - avg_speed) OVER()) /
-            NULLIF(MAX(20 - avg_speed) OVER() - MIN(20 - avg_speed) OVER(), 0) AS normalized_speed_loss
+        (total_311_complaints - MIN(total_311_complaints) OVER()) /
+            NULLIF(MAX(total_311_complaints) OVER() - MIN(total_311_complaints) OVER(), 0)
+            AS normalized_311_complaints
     FROM combined_metrics
 )
 
 SELECT
-    route_id,
     borough,
-    avg_speed,
-    avg_travel_time,
-    total_bus_trips,
-    total_violations,
-    total_complaints,
+    zip_code,
+    total_ace_violations,
+    total_311_complaints,
 
     ROUND(
         (
-            (normalized_violations * 0.4) +
-            (normalized_complaints * 0.3) +
-            (normalized_speed_loss * 0.3)
+            normalized_ace_violations * 0.6
+            +
+            normalized_311_complaints * 0.4
         ) * 100,
         2
     ) AS squeeze_index_score
